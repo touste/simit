@@ -106,7 +106,7 @@ void plot_results(string filename, Set& node, Set& triangle) {
  * \brief Main function. Read simit program and run on unit square
  ***************************************************************************/
 int main(int argc, char **argv) {
-    // initalize simit to use CPU for computation
+    // initalize simit to use CPU for computationpoints.m(node1) = 
     init("cpu", sizeof(double));
 
     if(argc != 2) { // request simit program as commandline argument
