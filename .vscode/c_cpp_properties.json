@@ -25,7 +25,7 @@
                 "/usr/include/c++/5",
                 "/usr/include/x86_64-linux-gnu/c++/5",
                 "/usr/local/include",
-                "/usr/lib/clang/3.8.0/include",
+                "/usr/lib/clang/3.8/include",
                 "/usr/include",
                 "/usr/include/x86_64-linux-gnu",
                 "~/dev/simit/src",
@@ -38,7 +38,7 @@
                     "/usr/include/c++/5",
                     "/usr/include/x86_64-linux-gnu/c++/5",
                     "/usr/local/include",
-                    "/usr/lib/clang/3.8.0/include",
+                    "/usr/lib/clang/3.8/include",
                     "/usr/include",
                     "/usr/include/x86_64-linux-gnu",
                     "${workspaceRoot}"

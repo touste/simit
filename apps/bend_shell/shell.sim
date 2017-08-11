@@ -25,6 +25,7 @@ end
 extern points : set{Point};
 extern faces : set{Face}(points, points, points);
 extern hinges: set{Hinge}(points, points, points, points);
+extern timeout : float;
 
 func computeAngle(p1 : vector[3](float), p2 : vector[3](float), q1 : vector[3](float), q2 : vector[3](float)) -> theta : float
   var ev = p2 - p1;
@@ -65,12 +66,15 @@ func precomputeFaceQuantities(inout f : Face, pts : (Point*3)) -> mass : tensor[
 
 
 end
-  
+
+func computeArea(pt0 : vector[3](float), pt1 : vector[3](float), pt2 : vector[3](float)) -> area : float
+  area = 0.5 * norm( cross(pt1 - pt0, pt2 - pt1) );
+end
 
 func precomputeHingeQuantities(inout h : Hinge, pts : (Point*4) )
   h.theta0 = computeAngle(pts(0).x, pts(1).x, pts(2).x, pts(3).x);
-  A1 = 0.5 * norm( cross(pts(1).x - pts(0).x, pts(2).x - pts(0).x) );
-  A2 = 0.5 * norm( cross(pts(1).x - pts(0).x, pts(3).x - pts(0).x) );
+  A1 = computeArea(pts(0).x, pts(1).x, pts(2).x);
+  A2 = computeArea(pts(0).x, pts(1).x, pts(3).x);
   e0 = norm(pts(1).x - pts(0).x);
   h.he0 = 2.0*(A1+A2)/e0;
 end
@@ -115,16 +119,24 @@ func bendingForce(h : Hinge, pts : (Point*4)) -> force : vector[points](vector[3
   M = h.B*curvature;
 
   ev = pts(1).x - pts(0).x;
-  t = 0.5*(dot(pts(2).x - pts(0).x, ev) + dot(pts(3).x - pts(0).x, ev))/dot(ev,ev);
-  T = (pts(0).x + t*ev);
-  L1 = pts(2).x - T;
-  L2 = pts(3).x - T;
+  evev = dot(ev,ev);
+  evnorm = sqrt(evev);
+  t2 = dot(pts(2).x - pts(0).x, ev)/evev;
+  t3 = dot(pts(3).x - pts(0).x, ev)/evev;
+  h2 = 2.0*computeArea(pts(0).x, pts(1).x, pts(2).x)/evnorm;
+  h3 = 2.0*computeArea(pts(0).x, pts(1).x, pts(3).x)/evnorm;
+  t = t2+(t3-t2)*h2/(h2+h3);
 
-  cEL1 = cross(ev,L1);
+  T2 = pts(0).x + t2*ev;
+  T3 = pts(0).x + t3*ev;
+  L2 = pts(2).x - T2;
+  L3 = pts(3).x - T3;
+
   cEL2 = cross(ev,L2);
+  cEL3 = cross(L3,ev);
 
-  force(pts(2)) = 0.5*M/norm(L1)*cEL1/norm(cEL1)*norm(ev);
-  force(pts(3)) = 0.5*M/norm(L2)*cEL2/norm(cEL2)*norm(ev);
+  force(pts(2)) = 0.5*M/norm(L2)*cEL2/norm(cEL2);
+  force(pts(3)) = 0.5*M/norm(L3)*cEL3/norm(cEL3);
   force(pts(0)) = -(force(pts(2))*t + force(pts(3))*(1.0-t));
   force(pts(1)) = -(force(pts(2))*(1.0-t) + force(pts(3))*t);
 
@@ -164,9 +176,10 @@ end
 
 export func main()
   timeStep = 1.0e-5;
-  damping = 1.0e-3;
+  damping = 1.0e-1;
+  var time : float = 0.0;
 
-  for i in 0:1000
+  while time < timeout
     du = timeStep * points.v;
     points.u = points.u + du;
     points.x = points.x + du;
@@ -182,5 +195,7 @@ export func main()
 
     impulse = gravity + Minv * intforce;
     points.v = points.v + timeStep * impulse;
+
+    time = time + timeStep;
   end
 end

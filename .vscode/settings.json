@@ -2,6 +2,7 @@
     "files.associations": {
         "ostream": "cpp",
         "functional": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "array": "cpp"
     }
 }

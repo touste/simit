@@ -53,9 +53,9 @@ if(NOT ${LLVM_CONFIG_RESULT} STREQUAL "0")
   endif()
 endif()
 
-if (NOT ${LLVM_VERSION} MATCHES "^([3-9]|[0-9][0-9]+)\\.([7-9]|[0-9][0-9]+)(\\.[0-9]+)?(svn)?$")
-  message(FATAL_ERROR "Need LLVM version 3.7 or higher. Found ${LLVM_CONFIG} version \"${LLVM_VERSION}\".")
-elseif (${LLVM_VERSION} MATCHES "^([3-9]|[0-9][0-9]+)\\.([5-9]|[0-9][0-9]+)(\\.[0-9]+)?(svn)?$")
+if (NOT ${LLVM_VERSION} MATCHES "^([3-9]|[0-9][0-9]+)\\.([0-9]|[0-9][0-9]+)(\\.[0-9]+)?(svn)?$")
+  message(FATAL_ERROR "Need LLVM version 3 or higher. Found ${LLVM_CONFIG} version \"${LLVM_VERSION}\".")
+elseif (${LLVM_VERSION} MATCHES "^([3-9]|[5-9][0-9]+)\\.([0-9]|[0-9][0-9]+)(\\.[0-9]+)?(svn)?$")
   set(LLVM_CONFIG_GT_45 1)
 endif()
 

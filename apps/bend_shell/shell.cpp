@@ -1,6 +1,6 @@
-//#include "visualizer/visualizer.h"
 #include "graph.h"
 #include "program.h"
+#include "visualizer/visualizer.h"
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -160,17 +160,17 @@ void set_props(Set& faces, Set& hinges) {
 
     for(auto f : faces) { 
         Nu(f) = 0.3;
-        E(f) = 1.0e3;
-        Rho(f) = 10.0;
+        E(f) = 1.0e2;
+        Rho(f) = 1.0;
     }    
 
     for(auto h : hinges) { 
-        B(h) = 1.0;
+        B(h) = 1.0e-4;
     }    
 
 }
 
-int main()
+int main(int argc, char **argv)
 {
 
     init("cpu", sizeof(double));
@@ -201,8 +201,10 @@ int main()
     FieldRef<double> E = faces.addField<double>("E");
     FieldRef<double> Rho = faces.addField<double>("Rho");
 
+    double timeout = 0.01;
+
     // create a mesh
-    make_mesh(10, 10, 1.0, 1.0, points, hinges, faces);
+    make_mesh(100, 100, 1.0, 1.0, points, hinges, faces);
     compute_loc_dir(faces);
     set_props(faces, hinges);
     
@@ -216,20 +218,26 @@ int main()
   precompute.bind("points",  &points);
   precompute.bind("hinges", &hinges);
   precompute.bind("faces", &faces);
-
+  precompute.bind("timeout", &timeout);
+  
   Function timestep   = program.compile("main");
   timestep.bind("points",  &points);
   timestep.bind("hinges", &hinges);
-  timestep.bind("faces", &faces);
-
-  //initDrawing();
-  //drawFaces(points, x, 1.0, 0.0, 0.0, 0.0); 
+  timestep.bind("faces", &faces);  
+  timestep.bind("timeout", &timeout);
 
   precompute.runSafe();
 
-  timestep.runSafe();       // Run the timestep function
+  char filename[32];
 
-  
-  plot_results("e1.vtk", points, faces);
+  plot_results("output/shell_000.vtk", points, faces);
+
+  for(int i=1; i<100; i++) {
+    timestep.runSafe();       // Run the timestep function
+    sprintf(filename, "output/shell_%03d.vtk", i);
+
+    plot_results(filename, points, faces);
+  }
+    
 
 }
