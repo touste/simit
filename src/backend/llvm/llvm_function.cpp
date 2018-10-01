@@ -323,8 +323,8 @@ Function::FuncType LLVMFunction::init() {
   Function::FuncType func;
   initialized = true;
   vector<string> formals = getArgs();
-  simit_iassert(formals.size() == llvmFunc->getArgumentList().size());
-  if (llvmFunc->getArgumentList().size() == 0) {
+  simit_iassert(formals.size() == llvmFunc->arg_size());
+  if (llvmFunc->arg_size() == 0) {
     llvm::Function *initFunc = getInitFunc();
     llvm::Function *deinitFunc = getDeinitFunc();
     // Call init()
@@ -335,7 +335,7 @@ Function::FuncType LLVMFunction::init() {
   }
   else {
     llvm::SmallVector<llvm::Value*, 8> args;
-    auto llvmArgIt = llvmFunc->getArgumentList().begin();
+    auto llvmArgIt = llvmFunc->arg_begin();
     for (const std::string& formal : formals) {
       simit_uassert(util::contains(arguments, formal))
           << "Could not find formal argument " << formal <<  " in "
@@ -473,7 +473,7 @@ llvm::Function* LLVMFunction::createHarness(
   llvm::Function *llvmFunc = module->getFunction(name);
   std::vector<string> argNames;
   std::vector<llvm::Type*> argTypes;
-  for (llvm::Argument &arg : llvmFunc->getArgumentList()) {
+  for (llvm::Argument &arg : llvmFunc->args()) {
     argNames.push_back(arg.getName());
     argTypes.push_back(arg.getType());
   }

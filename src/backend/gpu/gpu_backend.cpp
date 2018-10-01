@@ -57,7 +57,7 @@ GPUBackend::GPUBackend() : LLVMBackend() {
 }
 
 Function* GPUBackend::compile(ir::Func irFunc, const ir::Storage& storage) {
-  std::ofstream irFile("simit.sim", std::ofstream::trunc);
+  std::ofstream irFile(irFunc.getName()  + ".sim", std::ofstream::trunc);
   irFile << irFunc;
   irFile.close();
 
@@ -145,10 +145,9 @@ Function* GPUBackend::compile(ir::Func irFunc, const ir::Storage& storage) {
   
   pmBuilder.OptLevel = 3;
 
-  pmBuilder.BBVectorize = 1;
-  pmBuilder.LoopVectorize = 1;
-//  pmBuilder.LoadCombine = 1;
   pmBuilder.SLPVectorize = 1;
+  pmBuilder.LoopVectorize = 1;
+  //pmBuilder.MergeFunctions = 1;
 
   llvm::DataLayout dataLayout(module);
   module->setDataLayout(dataLayout);
@@ -639,12 +638,16 @@ void GPUBackend::compile(const ir::GPUKernel& op) {
   builder->SetInsertPoint(&kernel->getEntryBlock());
 
   // Parameter attributes
-  llvm::AttributeSet attrSet = kernel->getAttributes();
-  for (unsigned slot = 0; slot < attrSet.getNumSlots(); ++slot) {
-    int index = attrSet.getSlotIndex(slot);
-    attrSet = attrSet.addAttribute(LLVM_CTX, index, llvm::Attribute::NoAlias);
-  }
+  llvm::AttributeList attrSet = kernel->getAttributes();
+  attrSet = llvm::AttributeList::get(LLVM_CTX, attrSet);
   kernel->setAttributes(attrSet);
+
+  // llvm::AttributeSet attrSet = kernel->getAttributes();
+  // for (unsigned slot = 0; slot < attrSet.getNumSlots(); ++slot) {
+  //   int index = attrSet.getSlotIndex(slot);
+  //   attrSet = attrSet.addAttribute(LLVM_CTX, index, llvm::Attribute::NoAlias);
+  // }
+  // kernel->setAttributes(attrSet);
   
   llvm::BasicBlock *bodyStart = llvm::BasicBlock::Create(
     LLVM_CTX, "bodyStart", kernel);

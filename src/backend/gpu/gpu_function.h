@@ -5,7 +5,7 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include "cuda.h"
+
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"

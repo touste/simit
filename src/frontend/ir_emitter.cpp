@@ -448,6 +448,9 @@ void IREmitter::visit(MapExpr::Ptr expr) {
     }
   }
 
+
+
+
   // Map expressions are translated to map statements whose values are stored 
   // in temporary variables. Within the original expression in which the map 
   // appeared, the map is replaced with a read of the temporary variable.

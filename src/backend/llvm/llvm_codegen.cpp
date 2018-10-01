@@ -76,12 +76,12 @@ llvm::Function *createPrototypeLLVM(const std::string& name,
     f->setDoesNotThrow();
   }
   unsigned i = 0;
-  for (llvm::Argument &arg : f->getArgumentList()) {
+  for (llvm::Argument &arg : f->args()) {
     arg.setName(argNames[i]);
 
     // TODO(gkanwar): Move noalias code here from GPU implementation
     if (arg.getType()->isPointerTy()) {
-      f->setDoesNotCapture(i+1);  //  setDoesNotCapture(0) is the return value
+      f->addParamAttr(i, llvm::Attribute::NoCapture);
     }
     ++i;
   }

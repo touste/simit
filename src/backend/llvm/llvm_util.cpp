@@ -52,14 +52,14 @@ VoidFuncPtr getGlobalFunc(llvm::Function *func, llvm::ExecutionEngine *ee) {
 
 
 void logModule(llvm::Module *module, std::string fileName) {
-#ifdef SIMIT_DEBUG
+//#ifdef SIMIT_DEBUG
   std::string llStr;
   llvm::raw_string_ostream llOstr(llStr);
   llOstr << *module;
   std::ofstream llFile(fileName, std::ofstream::trunc);
   llFile << llStr << std::endl;
   llFile.close();
-#endif
+//#endif
 }
 
 }}

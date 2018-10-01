@@ -6,6 +6,7 @@
 
 #include "cuda.h"
 #include "nvvm.h"
+#include "cudaProfiler.h"
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
@@ -109,10 +110,14 @@ GPUFunction::GPUFunction(
   CUdevice device;
   int devCount;
 
+  
+
   // CUDA setup
   checkCudaErrors(cuInit(0));
   checkCudaErrors(cuDeviceGetCount(&devCount));
   checkCudaErrors(cuDeviceGet(&device, 0));
+
+  //checkCudaErrors(cuProfilerStart());
 
   char name[128];
   checkCudaErrors(cuDeviceGetName(name, 128, device));
@@ -152,6 +157,8 @@ GPUFunction::~GPUFunction() {
     delete kv.second;
   }
 
+  //checkCudaErrors(cuProfilerStop());
+
   // Clear CUDA module, if any
   if (cudaModule) {
     checkCudaErrors(cuModuleUnload(*cudaModule));
@@ -169,6 +176,7 @@ GPUFunction::~GPUFunction() {
     checkCudaErrors(cuCtxDestroy(*cudaContext));
     delete cudaContext;
   }
+
 }
 
 void GPUFunction::mapArgs() {
@@ -667,7 +675,7 @@ GPUFunction::init() {
   std::vector<std::string> libPtxStrs =
       generateLibraryPtx(cuDevMajor, cuDevMinor);
 
-#ifdef SIMIT_DEBUG
+//#ifdef SIMIT_DEBUG
   std::ofstream ptxFile("simit.ptx", std::ofstream::trunc);
   ptxFile << ptxStr << std::endl;
   ptxFile.close();
@@ -677,7 +685,7 @@ GPUFunction::init() {
     ptxLibFile << libPtxStrs[i] << std::endl;
     ptxLibFile.close();
   }
-#endif
+//#endif
 
   // JIT linker and final CUBIN
   char linkerInfo[16384];
@@ -687,16 +695,20 @@ GPUFunction::init() {
     CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES,
     CU_JIT_ERROR_LOG_BUFFER,
     CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
-    CU_JIT_LOG_VERBOSE
+    CU_JIT_LOG_VERBOSE,
+    CU_JIT_THREADS_PER_BLOCK,
+    CU_JIT_MAX_REGISTERS
   };
   void *linkerOptionValues[] = {
     linkerInfo,
     reinterpret_cast<void*>(16384),
     linkerErrors,
     reinterpret_cast<void*>(16384),
-    reinterpret_cast<void*>(1)
+    reinterpret_cast<void*>(1),
+    reinterpret_cast<void*>(128),
+    reinterpret_cast<void*>(128)
   };
-  checkCudaErrors(cuLinkCreate(5, linkerOptions, linkerOptionValues, &linker));
+  checkCudaErrors(cuLinkCreate(7, linkerOptions, linkerOptionValues, &linker));
 
   // libcudadevrt.a
   checkCudaErrors(cuLinkAddFile(linker, CU_JIT_INPUT_LIBRARY,

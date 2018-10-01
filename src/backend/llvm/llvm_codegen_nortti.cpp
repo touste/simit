@@ -50,8 +50,7 @@ Constant* llvmBool(bool val) {
 }
 
 Constant* llvmComplex(double real, double imag) {
-  return ConstantStruct::get(llvmComplexType(),
-                             llvmFP(real), llvmFP(imag), nullptr);
+  return ConstantStruct::get(llvmComplexType(), {llvmFP(real),llvmFP(imag)});
 }
 
 Constant *llvmPtr(PointerType* type, const void* data) {

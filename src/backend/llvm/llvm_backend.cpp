@@ -230,7 +230,7 @@ Function* LLVMBackend::compile(ir::Func func, const ir::Storage& storage) {
   
   pmBuilder.OptLevel = 3;
 
-  pmBuilder.BBVectorize = 1;
+ // pmBuilder.BBVectorize = 1;
   pmBuilder.LoopVectorize = 1;
 //  pmBuilder.LoadCombine = 1;
   pmBuilder.SLPVectorize = 1;
@@ -1590,11 +1590,11 @@ llvm::Function *LLVMBackend::emitEmptyFunction(const string &name,
   auto entry = llvm::BasicBlock::Create(LLVM_CTX, "entry", llvmFunc);
   builder->SetInsertPoint(entry);
 
-  simit_iassert(llvmFunc->getArgumentList().size() == arguments.size()+results.size())
+  simit_iassert(llvmFunc->arg_size() == arguments.size()+results.size())
       << "Number of arguments to llvm func does not match simit func arguments";
 
   // Add arguments and results to symbol table
-  auto llvmArgIt = llvmFunc->getArgumentList().begin();
+  auto llvmArgIt = llvmFunc->arg_begin();
   auto simitArgIt = arguments.begin();
   for (; simitArgIt < arguments.end(); ++simitArgIt, ++llvmArgIt) {
     symtable.insert(*simitArgIt, &(*llvmArgIt));
@@ -1765,7 +1765,7 @@ void LLVMBackend::emitAssign(Var var, const Expr& value) {
 
 void LLVMBackend::emitMemCpy(llvm::Value *dst, llvm::Value *src,
                              llvm::Value *size, unsigned align) {
-  builder->CreateMemCpy(dst, src, size, align);
+  builder->CreateMemCpy(dst, align, src, align, size);
 }
 
 void LLVMBackend::emitMemSet(llvm::Value *dst, llvm::Value *val,

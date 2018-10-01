@@ -3,6 +3,7 @@
 #include "nvvm.h"
 
 #include <fstream>
+#include <iostream>
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IRReader/IRReader.h"
@@ -10,9 +11,12 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 
 #include "llvm/IR/Intrinsics.h"
@@ -26,7 +30,7 @@ std::string intrinsicsPtxCache;
 
 /// Declare method in the NVPTX LLVM library
 namespace llvm {
-ModulePass *createNVVMReflectPass(const StringMap<int>& Mapping);
+  FunctionPass *createNVVMReflectPass();
 }
 
 namespace simit {
@@ -47,9 +51,7 @@ std::string utostr(uint num) {
 void setNVVMModuleProps(llvm::Module *module) {
   // Set appropriate data layout
   if (sizeof(void*) == 8) {
-    module->setDataLayout("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
-                          "i64:64:64-f32:32:32-f64:64:64-v16:16:16-v32:32:32-"
-                          "v64:64:64-v128:128:128-n16:32:64");
+    module->setDataLayout("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v32:32:32-v64:64:64-v128:128:128-n16:32:64");
     module->setTargetTriple("nvptx64-nvidia-cuda");
   }
   else {
@@ -79,16 +81,17 @@ llvm::Module *createNVVMModule(std::string name) {
 
 std::string generatePtx(llvm::Module *module, int devMajor, int devMinor) {
   std::string mcpu;
-  if ((devMajor == 3 && devMinor >= 5) ||
-      devMajor > 3) {
-    mcpu = "sm_35";
-  }
-  else if (devMajor >= 3 && devMinor >= 0) {
-    mcpu = "sm_30";
-  }
-  else {
-    mcpu = "sm_20";
-  }
+  mcpu = "sm_60";
+  // if ((devMajor == 3 && devMinor >= 5) ||
+  //     devMajor > 3) {
+  //   mcpu = "sm_35";
+  // }
+  // else if (devMajor >= 3 && devMinor >= 0) {
+  //   mcpu = "sm_30";
+  // }
+  // else {
+  //   mcpu = "sm_20";
+  //}
 
   // Select target given the module's triple
   llvm::Triple triple(module->getTargetTriple());
@@ -99,13 +102,13 @@ std::string generatePtx(llvm::Module *module, int devMajor, int devMinor) {
 
   llvm::TargetOptions targetOptions;
 
-  std::string features = "+ptx40";
+  std::string features = "+ptx60";
 
   std::unique_ptr<llvm::TargetMachine> targetMachine(
       target->createTargetMachine(triple.str(), mcpu, features, targetOptions,
                                   // llvm::Reloc::PIC_,
-                                  llvm::Reloc::Default,
-                                  llvm::CodeModel::Default,
+                                  llvm::Reloc::PIC_,
+                                  llvm::CodeModel::Small,
                                   llvm::CodeGenOpt::Default));
 
   // Make a passmanager and add emission to string
@@ -113,20 +116,43 @@ std::string generatePtx(llvm::Module *module, int devMajor, int devMinor) {
   pm.add(new llvm::TargetLibraryInfoWrapperPass(triple));
 
   // Set up constant NVVM reflect mapping
-  llvm::StringMap<int> reflectMapping;
-  reflectMapping["__CUDA_FTZ"] = 1; // Flush denormals to zero
-  pm.add(llvm::createNVVMReflectPass(reflectMapping));
-  pm.add(llvm::createAlwaysInlinerPass());
+   #define kFTZDenorms     1
+   module->addModuleFlag(llvm::Module::Override, "nvvm-reflect-ftz",kFTZDenorms);
+
+   for (llvm::Function &fn : *module) {
+    fn.addFnAttr("nvptx-f32ftz", "true");
+   }
+  
+   llvm::PassManagerBuilder pmBuilder;
+  
+   pmBuilder.OptLevel = 3;
+
+  pmBuilder.SLPVectorize = 1;
+  pmBuilder.LoopVectorize = 1;
+  pmBuilder.MergeFunctions = 1;
+
+  pmBuilder.Inliner = llvm::createFunctionInliningPass(pmBuilder.OptLevel, 0, false);
+
+  targetMachine->adjustPassManager(pmBuilder);
+
+
+  //llvm::StringMap<int> reflectMapping;
+  //reflectMapping["__CUDA_FTZ"] = 1; // Flush denormals to zero
+  pm.add(llvm::createNVVMReflectPass());
+  pm.add(llvm::createAlwaysInlinerLegacyPass());
+  
+  module->setDataLayout(targetMachine->createDataLayout());
+  
   targetMachine->Options.MCOptions.AsmVerbose = true;
   llvm::SmallString<8> ptxStr;
   llvm::raw_svector_ostream outStream(ptxStr);
   outStream.SetUnbuffered();
   bool failed = targetMachine->addPassesToEmitFile(
-      pm, outStream, targetMachine->CGFT_AssemblyFile, false);
+      pm, outStream, nullptr, targetMachine->CGFT_AssemblyFile, false);
   simit_iassert(!failed);
 
+
   pm.run(*module);
-  outStream.flush();
   return ptxStr.str();
 }
 
@@ -136,6 +162,8 @@ extern "C" unsigned char simit_gpu_libdevice_compute_30[];
 extern "C" int simit_gpu_libdevice_compute_30_length;
 extern "C" unsigned char simit_gpu_libdevice_compute_35[];
 extern "C" int simit_gpu_libdevice_compute_35_length;
+extern "C" unsigned char simit_gpu_libdevice_compute_60[];
+extern "C" int simit_gpu_libdevice_compute_60_length;
 
 extern "C" unsigned char simit_gpu_intrinsics[];
 extern "C" int simit_gpu_intrinsics_length;
@@ -159,18 +187,20 @@ std::vector<std::string> generateLibraryPtx(int devMajor, int devMinor) {
   // Identify device by Compute API level
   const char *libdevice;
   int libdevice_length;
-  if ((devMajor == 3 && devMinor >= 5) ||
-      devMajor > 3) {
-    libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_35);
-    libdevice_length = simit_gpu_libdevice_compute_35_length;
-  }
-  else if (devMajor == 3 && devMinor >= 0) {
-    libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_30);
-    libdevice_length = simit_gpu_libdevice_compute_30_length;
-  } else {
-    libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_20);
-    libdevice_length = simit_gpu_libdevice_compute_20_length;
-  }
+    // if ((devMajor == 3 && devMinor >= 5) ||
+  //     devMajor > 3) {
+  //   libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_35);
+  //   libdevice_length = simit_gpu_libdevice_compute_35_length;
+  // }
+  // else if (devMajor == 3 && devMinor >= 0) {
+  //   libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_30);
+  //   libdevice_length = simit_gpu_libdevice_compute_30_length;
+  // } else {
+  //   libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_20);
+  //   libdevice_length = simit_gpu_libdevice_compute_20_length;
+  // }
+  libdevice = reinterpret_cast<const char*>(simit_gpu_libdevice_compute_60);
+  libdevice_length = simit_gpu_libdevice_compute_60_length;
   llvm::SMDiagnostic errReport;
   libdevice_length = alignBitreaderLength(libdevice_length);
   llvm::MemoryBufferRef libdeviceBuf(

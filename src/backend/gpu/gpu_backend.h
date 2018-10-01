@@ -46,9 +46,9 @@ protected:
   ir::GpuVarCleaner cleaner;
 
   // For now: Constant GPU blocking
-  const int xBlockSize = 16;
-  const int yBlockSize = 16;
-  const int zBlockSize = 16;
+  const int xBlockSize = 128;
+  const int yBlockSize = 128;
+  const int zBlockSize = 128;
 
   // Tracking whether we're in a kernel
   bool inKernel;
